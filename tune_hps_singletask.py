@@ -34,13 +34,10 @@ import pandas as pd
 from modeling_t5 import (
     T5Model,
     T5ForConditionalGeneration,
-    # T5Tokenizer,
-    # T5Config
 )
 from configuration_t5 import T5Config
 from transformers import T5Tokenizer
 
-# from run_singletask_t5 import run
 from t5_trainer import Trainer
 
 def model_provider(args):
@@ -69,18 +66,7 @@ def model_provider(args):
         lora_uniform=args.lora_uniform,
         )
     tokenizer = T5Tokenizer.from_pretrained(args.tokenizer_path)
-    # tokenizer = T5Tokenizer.from_pretrained('/home/yijing/CrossFit_ensemble/pretrained_models/t5-v1_1-base',config=config)
     model = T5ForConditionalGeneration.from_pretrained(args.model,config=config)
-    '''
-    from transformers import AutoTokenizer, AutoModelForSeq2SeqLM, AutoConfig
-    config = AutoConfig.from_pretrained(args.model)
-    # tokenizer = AutoTokenizer.from_pretrained(args.model,config=config)
-    tokenizer = AutoTokenizer.from_pretrained(args.model)
-    # tokenizer = AutoTokenizer.from_pretrained('/home/yijing/CrossFit_ensemble/pretrained_models/t5-v1_1-base')
-    model = AutoModelForSeq2SeqLM.from_pretrained(args.model,config=config)
-    '''
-    
-    
     return model, config, tokenizer
 
 
@@ -163,7 +149,6 @@ def main():
 
     # to prompt tuning
     parser.add_argument("--prompt_num", type=int, default=100)
-    # parser.add_argument("--do_prompt", action='store_true', help="prompt tuning or not")
     parser.add_argument("--tune_method", type=str, help="model or prompt or lora or lora_stage2 or bias or bias_stage2 or hyper_PET")
     parser.add_argument("--do_inherit_prompt", action='store_true', help="inherit prompt or not")
     parser.add_argument("--inherit_prompt_path", type=str)
@@ -222,7 +207,7 @@ def main():
         os.makedirs(args.output_dir, exist_ok=True)
     output_dir = args.output_dir
 
-    ##### Start writing logs
+    ##### Start writing logs ######
 
     log_filename = "{}log.txt".format("" if args.do_train else "eval_")
 
@@ -260,7 +245,11 @@ def main():
 
     data_dir = args.task_dir
     output_dir = args.output_dir
+    train_checkpoint = args.train_checkpoint
     for task in TASK_LIST:
+        if train_checkpoint:
+            args.train_checkpoint = train_checkpoint + '/without_' + task + '_checkpoint.pt'
+
         args.task_dir = data_dir+'/'+task
         files = sorted(os.listdir(args.task_dir))
         prefixes = []
@@ -279,11 +268,6 @@ def main():
             args.dev_file = os.path.join(args.task_dir, prefix + "_dev.tsv")
             args.test_file = os.path.join(args.task_dir, prefix + "_test.tsv")
 
-            '''
-            path_prompt_save = os.path.join(args.output_dir, "prompt_weight")
-            if not os.path.exists(path_prompt_save):
-                os.mkdir(path_prompt_save)
-            '''
             for bsz in args.bsz_list:
                 for lr in args.learning_rate_list:
                     args.learning_rate = lr

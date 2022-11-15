@@ -17,15 +17,11 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
-import sys
-sys.path.append('..')
 from task_list import QA_task_list as TASK_LIST
 
 import os
-import sys
 import argparse
 import logging
-import shutil
 
 import random
 import numpy as np
@@ -34,7 +30,6 @@ import torch
 import pandas as pd
 
 from modeling_t5 import (
-    T5Model,
     T5ForConditionalGeneration,
 )
 from configuration_t5 import T5Config
@@ -69,6 +64,7 @@ def model_provider(args):
         )
     tokenizer = T5Tokenizer.from_pretrained(args.tokenizer_path)
     model = T5ForConditionalGeneration.from_pretrained(args.model,config=config)
+    
     return model, config, tokenizer
 
 
@@ -82,11 +78,9 @@ def main():
     parser.add_argument("--test_file", default="data", required=False)
     parser.add_argument("--dataset", default="nlp_forest_single", required=False)
     parser.add_argument("--model", default="facebook/t5-base", required=False)
+    parser.add_argument("--tokenizer_path", default="facebook/t5-base", required=False)
     parser.add_argument("--train_checkpoint", default=None, required=False)
     parser.add_argument("--test_checkpoint", default=None, required=False)
-    parser.add_argument("--source_checkpoint_path", default=None, required=False)
-    parser.add_argument("--random_tuned_ckpt_path", default=None, required=False)
-    parser.add_argument("--tokenizer_path", default="facebook/t5-base", required=False)
     
     parser.add_argument("--output_dir", default=None, type=str, required=True)
     parser.add_argument("--do_train", action='store_true')
@@ -137,7 +131,7 @@ def main():
                              "A number of warnings are expected for a normal SQuAD evaluation.")
     parser.add_argument('--valid_interval', type=int, default=2000,
                         help="Evaluate & save model")
-    parser.add_argument("--output_interval", type=int, default=200000)
+    parser.add_argument("--output_interval", type=int, default=2000)
     parser.add_argument("--log_interval", type=int, default=100)
     parser.add_argument("--early_stop", type=int, default=-1)
     parser.add_argument('--prefix', type=str, default='',
@@ -153,6 +147,7 @@ def main():
 
     # to prompt tuning
     parser.add_argument("--prompt_num", type=int, default=100)
+    # parser.add_argument("--do_prompt", action='store_true', help="prompt tuning or not")
     parser.add_argument("--tune_method", type=str, help="model or prompt or lora or lora_stage2 or bias or bias_stage2 or hyper_PET")
     parser.add_argument("--do_inherit_prompt", action='store_true', help="inherit prompt or not")
     parser.add_argument("--inherit_prompt_path", type=str)
@@ -249,8 +244,6 @@ def main():
 
     data_dir = args.task_dir
     for task in TASK_LIST:
-        with open(args.output_dir+'/result.tsv', 'a') as fout:
-            fout.write(task + '\n')
         args.task_dir = data_dir+'/'+task
         files = sorted(os.listdir(args.task_dir))
         prefixes = []
@@ -278,9 +271,9 @@ def main():
                     else:
                         args.train_batch_size = bsz
                         args.gradient_accumulation_steps = 1
-
+                    
                     trainer = Trainer(args, logger, model_provider)
-                    trainer.get_KL_divergence(target_task=task)
+                    trainer.test_all_ckpt()
 
 if __name__=='__main__':
     main()

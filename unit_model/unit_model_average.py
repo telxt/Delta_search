@@ -3,11 +3,13 @@ import torch
 from collections import OrderedDict
 import copy
 import os
+import sys
+sys.path.append('..')
 from task_list import QA_task_list as TASK_LIST
 
 delta = 'adapter'
 source_ckpt_path = '/home/lvxingtai/lxt/crossfit_yijing/checkpoints/adapter/qa_tasks_128shot/fulldata'
-save_ckpt_path = '/home/lvxingtai/lxt/crossfit_yijing/checkpoints/adapter/average_all_tasks'
+save_ckpt_path = '/home/lvxingtai/lxt/delta_search_code/checkpoints/adapter/average_all_tasks'
 os.makedirs(save_ckpt_path, exist_ok=True)
 
 if delta == 'adapter':

@@ -17,6 +17,8 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
+import sys
+sys.path.append('..')
 from task_list import QA_task_list as TASK_LIST
 
 import os
@@ -34,13 +36,10 @@ import pandas as pd
 from modeling_t5 import (
     T5Model,
     T5ForConditionalGeneration,
-    # T5Tokenizer,
-    # T5Config
 )
 from configuration_t5 import T5Config
 from transformers import T5Tokenizer
 
-# from run_singletask_t5 import run
 from t5_trainer import Trainer
 
 def model_provider(args):
@@ -69,18 +68,7 @@ def model_provider(args):
         lora_uniform=args.lora_uniform,
         )
     tokenizer = T5Tokenizer.from_pretrained(args.tokenizer_path)
-    # tokenizer = T5Tokenizer.from_pretrained('/home/yijing/CrossFit_ensemble/pretrained_models/t5-v1_1-base',config=config)
     model = T5ForConditionalGeneration.from_pretrained(args.model,config=config)
-    '''
-    from transformers import AutoTokenizer, AutoModelForSeq2SeqLM, AutoConfig
-    config = AutoConfig.from_pretrained(args.model)
-    # tokenizer = AutoTokenizer.from_pretrained(args.model,config=config)
-    tokenizer = AutoTokenizer.from_pretrained(args.model)
-    # tokenizer = AutoTokenizer.from_pretrained('/home/yijing/CrossFit_ensemble/pretrained_models/t5-v1_1-base')
-    model = AutoModelForSeq2SeqLM.from_pretrained(args.model,config=config)
-    '''
-    
-    
     return model, config, tokenizer
 
 
@@ -95,6 +83,8 @@ def main():
     parser.add_argument("--dataset", default="nlp_forest_single", required=False)
     parser.add_argument("--model", default="facebook/t5-base", required=False)
     parser.add_argument("--tokenizer_path", default="facebook/t5-base", required=False)
+    parser.add_argument("--train_checkpoint", default=None, required=False)
+    parser.add_argument("--test_checkpoint", default=None, required=False)
     
     parser.add_argument("--output_dir", default=None, type=str, required=True)
     parser.add_argument("--do_train", action='store_true')
@@ -161,7 +151,6 @@ def main():
 
     # to prompt tuning
     parser.add_argument("--prompt_num", type=int, default=100)
-    # parser.add_argument("--do_prompt", action='store_true', help="prompt tuning or not")
     parser.add_argument("--tune_method", type=str, help="model or prompt or lora or lora_stage2 or bias or bias_stage2 or hyper_PET")
     parser.add_argument("--do_inherit_prompt", action='store_true', help="inherit prompt or not")
     parser.add_argument("--inherit_prompt_path", type=str)
@@ -220,7 +209,7 @@ def main():
         os.makedirs(args.output_dir, exist_ok=True)
     output_dir = args.output_dir
 
-    ##### Start writing logs
+    ##### Start writing logs #####
 
     log_filename = "{}log.txt".format("" if args.do_train else "eval_")
 
@@ -277,11 +266,6 @@ def main():
             args.dev_file = os.path.join(args.task_dir, prefix + "_dev.tsv")
             args.test_file = os.path.join(args.task_dir, prefix + "_test.tsv")
 
-            '''
-            path_prompt_save = os.path.join(args.output_dir, "prompt_weight")
-            if not os.path.exists(path_prompt_save):
-                os.mkdir(path_prompt_save)
-            '''
             for bsz in args.bsz_list:
                 for lr in args.learning_rate_list:
                     args.learning_rate = lr
@@ -293,15 +277,17 @@ def main():
                         args.gradient_accumulation_steps = 1
                     
                     args.output_dir = output_dir + '/' + task
+                    os.makedirs(args.output_dir, exist_ok=True)
+                    with open(args.output_dir+'/result.tsv', 'a') as fout:
+                        fout.write(task+'\n')
                     if os.path.exists(f"{args.output_dir}/checkpoint-last.pt"):
                         logger.info("Done ... prefix={}, lr={}, bsz={} ...!!!".format(prefix, lr, bsz))
                         exit()
                     logger.info("Running ... prefix={}, lr={}, bsz={} ...".format(prefix, lr, bsz))
                     trainer = Trainer(args, logger, model_provider)
 
-                    dev_performance = None
-                    test_performance = None
-                    trainer.get_block(target_task=task, mode='decoder_cos_last')
+                    trainer.train_and_test_on_all_ckpt(out_path = args.output_dir, save_last = True)
+                    
 
 if __name__=='__main__':
     main()
