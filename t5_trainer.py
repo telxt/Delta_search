@@ -735,1080 +735,19 @@ class Trainer:
         return None
 
     def get_block(self, target_task, mode):
-        if mode == 'KL':
-            # 代码有问题，这个机制也存在问题
-            import scipy.stats
-            import numpy
-
+        if mode == 'cos_withoutpad':
             for i in range(12):
-                with open('/home/lvxingtai/lxt/crossfit_yijing/checkpoints/adapter/qa_tasks/KL50_block_tem10/KL_block_initial_data/encoder_block_'+str(i)+'.tsv', 'a') as fout:
+                with open(self.args.output_dir+'/encoder_block_'+str(i)+'_result.tsv', 'a') as fout:
                     fout.write(target_task+'\n')
-                with open('/home/lvxingtai/lxt/crossfit_yijing/checkpoints/adapter/qa_tasks/KL50_block_tem10/KL_block_initial_data/decoder_block_'+str(i)+'.tsv', 'a') as fout:
-                    fout.write(target_task+'\n')
-            with open('/home/lvxingtai/lxt/crossfit_yijing/checkpoints/adapter/qa_tasks/KL50_block_tem10/KL_block_initial_data/encoder.tsv', 'a') as fout:
-                fout.write(target_task+'\n')
-            with open('/home/lvxingtai/lxt/crossfit_yijing/checkpoints/adapter/qa_tasks/KL50_block_tem10/KL_block_initial_data/decoder.tsv', 'a') as fout:
-                fout.write(target_task+'\n')
-
-            dataloader = self.dev_data.dataloader
-
-            target_ckpt_path = '/home/lvxingtai/lxt/crossfit_yijing/checkpoints/adapter/qa_tasks/64_tune/'+target_task+'_best.pt'
-            self.load_checkpoint(target_ckpt_path)
-            self.model.eval()
-
-            with torch.no_grad():
-                for local_step, batch in enumerate(dataloader):
-                    all_input = self.prepare_data(batch)
-                    output = self.model(**all_input,output_hidden_states=True)
-                    target_encoder_hidden_states = output['encoder_hidden_states']
-                    target_decoder_hidden_states = output['decoder_hidden_states']
-                    break
-
-            #get source logits and cum KL_divergence
-            from task_list import QA_task_list
-            for task in QA_task_list:
-                source_ckpt_path = '/data/private/yijing/CrossFit_ensemble/models/full_data_adapter/'+task \
-                    +'-adapter_size_12-seed_42/lr_0.0005_bsz_16_seed_42/checkpoint-best.pt'
-                self.load_checkpoint(source_ckpt_path)
-                self.model.eval()
-
-                with torch.no_grad():
-                    for local_step, batch in enumerate(dataloader):
-                        all_input = self.prepare_data(batch)
-                        output = self.model(**all_input,output_hidden_states=True)
-                        source_encoder_hidden_states = output['encoder_hidden_states']
-                        source_decoder_hidden_states = output['decoder_hidden_states']
-                        break
-
-                for i in range(12):
-                    KL_sum = 0
-                    for j in range(len(target_encoder_hidden_states[i])):
-                        for k in range(len(target_encoder_hidden_states[i][j])):
-                            P = torch.softmax(target_encoder_hidden_states[i][j][k],0).cpu().numpy()
-                            Q = torch.softmax(source_encoder_hidden_states[i][j][k],0).cpu().numpy()
-                            zero_index = numpy.union1d(np.where(P==0)[0],np.where(Q==0)[0])
-                            P = numpy.delete(P, zero_index)
-                            Q = numpy.delete(Q, zero_index)
-                            KL_sum += scipy.stats.entropy(pk=P, qk=Q)
-                    with open('/home/lvxingtai/lxt/crossfit_yijing/checkpoints/adapter/qa_tasks/KL50_block_tem10/KL_block_initial_data/encoder_block_'+str(i)+'.tsv', 'a') as fout:
-                        fout.write(task+','+str(KL_sum)+'\n')
-
-                    KL_sum = 0
-                    for j in range(len(target_decoder_hidden_states[i])):
-                        for k in range(len(target_decoder_hidden_states[i][j])):
-                            P = torch.softmax(target_decoder_hidden_states[i][j][k],0).cpu().numpy()
-                            Q = torch.softmax(source_decoder_hidden_states[i][j][k],0).cpu().numpy()
-                            zero_index = numpy.union1d(np.where(P==0)[0],np.where(Q==0)[0])
-                            P = numpy.delete(P, zero_index)
-                            Q = numpy.delete(Q, zero_index)
-                            KL_sum += scipy.stats.entropy(pk=P, qk=Q)
-                            print(len(P))
-                    from IPython import embed
-                    embed()
-                    import sys
-                    sys.exit(0)
-
-                    with open('/home/lvxingtai/lxt/crossfit_yijing/checkpoints/adapter/qa_tasks/KL50_block_tem10/KL_block_initial_data/decoder_block_'+str(i)+'.tsv', 'a') as fout:
-                        fout.write(task+','+str(KL_sum)+'\n')
-                
-                KL_sum = 0
-                for j in range(len(target_encoder_hidden_states[12])):
-                    for k in range(len(target_encoder_hidden_states[12][j])):
-                        P = torch.softmax(target_encoder_hidden_states[12][j][k],0).cpu().numpy()
-                        Q = torch.softmax(source_encoder_hidden_states[12][j][k],0).cpu().numpy()
-                        zero_index = numpy.union1d(np.where(P==0)[0],np.where(Q==0)[0])
-                        P = numpy.delete(P, zero_index)
-                        Q = numpy.delete(Q, zero_index)
-                        KL_sum += scipy.stats.entropy(pk=P, qk=Q)
-                with open('/home/lvxingtai/lxt/crossfit_yijing/checkpoints/adapter/qa_tasks/KL50_block_tem10/KL_block_initial_data/encoder.tsv', 'a') as fout:
-                    fout.write(task+','+str(KL_sum)+'\n')
-            
-                KL_sum = 0
-                for j in range(len(target_encoder_hidden_states[12])):
-                    for k in range(len(target_encoder_hidden_states[12][j])):
-                        P = torch.softmax(target_encoder_hidden_states[12][j][k],0).cpu().numpy()
-                        Q = torch.softmax(source_encoder_hidden_states[12][j][k],0).cpu().numpy()
-                        zero_index = numpy.union1d(np.where(P==0)[0],np.where(Q==0)[0])
-                        P = numpy.delete(P, zero_index)
-                        Q = numpy.delete(Q, zero_index)
-                        KL_sum += scipy.stats.entropy(pk=P, qk=Q)
-                with open('/home/lvxingtai/lxt/crossfit_yijing/checkpoints/adapter/qa_tasks/KL50_block_tem10/KL_block_initial_data/encoder.tsv', 'a') as fout:
-                    fout.write(task+','+str(KL_sum)+'\n')
-        
-        if mode == 'dif_last':
-            with open('/home/lvxingtai/lxt/crossfit_yijing/result/adapter/qa_tasks/block/dif_last.tsv', 'a') as fout:
-                fout.write(target_task+'\n')
-            dataloader = self.dev_data.dataloader
-
-            #get target logits(use 64_tune ckpt)
-            target_ckpt_path = '/home/lvxingtai/lxt/crossfit_yijing/checkpoints/adapter/qa_tasks/64_tune/'+target_task+'_best.pt'
-            self.load_checkpoint(target_ckpt_path)
-            self.model.eval()
-
-            with torch.no_grad():
-                for local_step, batch in enumerate(dataloader):
-                    all_input = self.prepare_data(batch)
-                    output = self.model(**all_input)
-                    target_logits = output[1]
-                    target_labels = batch[2]
-                    break
-
-            #get source logits and cum KL_divergence
-            from task_list import QA_task_list
-            for task in QA_task_list:
-                source_ckpt_path = '/data/private/yijing/CrossFit_ensemble/models/full_data_adapter/'+task \
-                    +'-adapter_size_12-seed_42/lr_0.0005_bsz_16_seed_42/checkpoint-best.pt'
-                self.load_checkpoint(source_ckpt_path)
-                self.model.eval()
-
-                with torch.no_grad():
-                    for local_step, batch in enumerate(dataloader):
-                        all_input = self.prepare_data(batch)
-                        output = self.model(**all_input)
-                        source_logits = output[1]
-                        source_labels = batch[2]
-                        break
-
-                dif_sum = torch.norm(target_logits-source_logits)
-                with open('/home/lvxingtai/lxt/crossfit_yijing/result/adapter/qa_tasks/block/dif_last.tsv', 'a') as fout:
-                    fout.write(task+','+str(float(dif_sum))+'\n')
-
-        if mode == 'dif_last_label':
-            with open('/home/lvxingtai/lxt/crossfit_yijing/result/adapter/qa_tasks/block/dif_last_label.tsv', 'a') as fout:
-                fout.write(target_task+'\n')
-            dataloader = self.dev_data.dataloader
-
-            #get target logits(use 64_tune ckpt)
-            target_ckpt_path = '/home/lvxingtai/lxt/crossfit_yijing/checkpoints/adapter/qa_tasks/64_tune/'+target_task+'_best.pt'
-            self.load_checkpoint(target_ckpt_path)
-            self.model.eval()
-
-            with torch.no_grad():
-                for local_step, batch in enumerate(dataloader):
-                    all_input = self.prepare_data(batch)
-                    output = self.model(**all_input)
-                    target_logits = output[1]
-                    target_labels = batch[2]
-                    break
-
-            #get source logits and cum KL_divergence
-            from task_list import QA_task_list
-            for task in QA_task_list:
-                source_ckpt_path = '/data/private/yijing/CrossFit_ensemble/models/full_data_adapter/'+task \
-                    +'-adapter_size_12-seed_42/lr_0.0005_bsz_16_seed_42/checkpoint-best.pt'
-                self.load_checkpoint(source_ckpt_path)
-                self.model.eval()
-
-                with torch.no_grad():
-                    for local_step, batch in enumerate(dataloader):
-                        all_input = self.prepare_data(batch)
-                        output = self.model(**all_input)
-                        source_logits = output[1]
-                        source_labels = batch[2]
-                        break
-
-                dif_sum = 0
-                for i in range(len(target_labels)):
-                    for j in range(len(target_labels[i])):
-                        if int(target_labels[i][j]) == -100:
-                            break
-                        dif_sum += torch.norm(target_logits[i][j]-source_logits[i][j])
-
-                with open('/home/lvxingtai/lxt/crossfit_yijing/result/adapter/qa_tasks/block/dif_last_label.tsv', 'a') as fout:
-                    fout.write(task+','+str(float(dif_sum))+'\n')
-
-        if mode == 'dif_last_label_all':
-            with open('/home/lvxingtai/lxt/crossfit_yijing/result/adapter/qa_tasks/block/dif_last_label_all.tsv', 'a') as fout:
-                fout.write(target_task+'\n')
-            dataloader = self.dev_data.dataloader
-
-            #get target logits(use 64_tune ckpt)
-            target_ckpt_path = '/home/lvxingtai/lxt/crossfit_yijing/checkpoints/adapter/qa_tasks/64_tune/'+target_task+'_best.pt'
-            self.load_checkpoint(target_ckpt_path)
-            self.model.eval()
-
-            with torch.no_grad():
-                for local_step, batch in enumerate(dataloader):
-                    all_input = self.prepare_data(batch)
-                    output = self.model(**all_input)
-                    target_logits = output[1]
-                    target_labels = batch[2]
-                    break
-
-            #get source logits and cum KL_divergence
-            from task_list import QA_task_list
-            for task in QA_task_list:
-                source_ckpt_path = '/data/private/yijing/CrossFit_ensemble/models/full_data_adapter/'+task \
-                    +'-adapter_size_12-seed_42/lr_0.0005_bsz_16_seed_42/checkpoint-best.pt'
-                self.load_checkpoint(source_ckpt_path)
-                self.model.eval()
-
-                with torch.no_grad():
-                    for local_step, batch in enumerate(dataloader):
-                        all_input = self.prepare_data(batch)
-                        output = self.model(**all_input)
-                        source_logits = output[1]
-                        source_labels = batch[2]
-                        break
-
-                dif_sum = 0
-                for i in range(len(target_labels)):
-                    if any(target_labels[i]==-100):
-                        j = int(torch.nonzero(target_labels[i]==-100).squeeze(1)[0])
-                        dif_sum += torch.norm(target_logits[i,0:j,:]-source_logits[i,0:j,:])
-                    else:
-                        dif_sum += torch.norm(target_logits[i,:,:]-source_logits[i,:,:])
-
-                with open('/home/lvxingtai/lxt/crossfit_yijing/result/adapter/qa_tasks/block/dif_last_label_all.tsv', 'a') as fout:
-                    fout.write(task+','+str(float(dif_sum))+'\n')
-
-        if mode == 'cos_last':
-            with open('/home/lvxingtai/lxt/crossfit_yijing/result/adapter/qa_tasks/block/cos_last.tsv', 'a') as fout:
-                fout.write(target_task+'\n')
-            dataloader = self.dev_data.dataloader
-
-            #get target logits(use 64_tune ckpt)
-            target_ckpt_path = '/home/lvxingtai/lxt/crossfit_yijing/checkpoints/adapter/qa_tasks/64_tune/'+target_task+'_best.pt'
-            self.load_checkpoint(target_ckpt_path)
-            self.model.eval()
-
-            with torch.no_grad():
-                for local_step, batch in enumerate(dataloader):
-                    all_input = self.prepare_data(batch)
-                    output = self.model(**all_input)
-                    target_logits = output[1]
-                    target_labels = batch[2]
-                    break
-
-            #get source logits and cum KL_divergence
-            from task_list import QA_task_list
-            for task in QA_task_list:
-                source_ckpt_path = '/data/private/yijing/CrossFit_ensemble/models/full_data_adapter/'+task \
-                    +'-adapter_size_12-seed_42/lr_0.0005_bsz_16_seed_42/checkpoint-best.pt'
-                self.load_checkpoint(source_ckpt_path)
-                self.model.eval()
-
-                with torch.no_grad():
-                    for local_step, batch in enumerate(dataloader):
-                        all_input = self.prepare_data(batch)
-                        output = self.model(**all_input)
-                        source_logits = output[1]
-                        source_labels = batch[2]
-                        break
-
-                cos_sim = torch.nn.CosineSimilarity(dim=0, eps=1e-6)
-                sim = cos_sim(target_logits.view(-1),source_logits.view(-1))
-
-                with open('/home/lvxingtai/lxt/crossfit_yijing/result/adapter/qa_tasks/block/cos_last.tsv', 'a') as fout:
-                    fout.write(task+','+str(float(sim))+'\n')
-
-        if mode == 'cos_last_label':
-            with open('/home/lvxingtai/lxt/crossfit_yijing/result/adapter/qa_tasks/block/cos_last_label.tsv', 'a') as fout:
-                fout.write(target_task+'\n')
-            dataloader = self.dev_data.dataloader
-
-            #get target logits(use 64_tune ckpt)
-            target_ckpt_path = '/home/lvxingtai/lxt/crossfit_yijing/checkpoints/adapter/qa_tasks/64_tune/'+target_task+'_best.pt'
-            self.load_checkpoint(target_ckpt_path)
-            self.model.eval()
-
-            with torch.no_grad():
-                for local_step, batch in enumerate(dataloader):
-                    all_input = self.prepare_data(batch)
-                    output = self.model(**all_input)
-                    target_logits = output[1]
-                    target_labels = batch[2]
-                    break
-
-            #get source logits and cum KL_divergence
-            from task_list import QA_task_list
-            for task in QA_task_list:
-                source_ckpt_path = '/data/private/yijing/CrossFit_ensemble/models/full_data_adapter/'+task \
-                    +'-adapter_size_12-seed_42/lr_0.0005_bsz_16_seed_42/checkpoint-best.pt'
-                self.load_checkpoint(source_ckpt_path)
-                self.model.eval()
-
-                with torch.no_grad():
-                    for local_step, batch in enumerate(dataloader):
-                        all_input = self.prepare_data(batch)
-                        output = self.model(**all_input)
-                        source_logits = output[1]
-                        source_labels = batch[2]
-                        break
-
-                cos_sim = torch.nn.CosineSimilarity(dim=0, eps=1e-6)
-                cos_sum = 0
-                for i in range(len(target_labels)):
-                    for j in range(len(target_labels[i])):
-                        if int(target_labels[i][j]) == -100:
-                            break
-                        cos_sum += cos_sim(target_logits[i][j],source_logits[i][j])
-
-                with open('/home/lvxingtai/lxt/crossfit_yijing/result/adapter/qa_tasks/block/cos_last_label.tsv', 'a') as fout:
-                    fout.write(task+','+str(float(cos_sum))+'\n')
-
-        if mode == 'cos_last_label_all':
-            with open('/home/lvxingtai/lxt/crossfit_yijing/result/adapter/qa_tasks/block/cos_last_label_all.tsv', 'a') as fout:
-                fout.write(target_task+'\n')
-            dataloader = self.dev_data.dataloader
-
-            #get target logits(use 64_tune ckpt)
-            target_ckpt_path = '/home/lvxingtai/lxt/crossfit_yijing/checkpoints/adapter/qa_tasks/64_tune/'+target_task+'_best.pt'
-            self.load_checkpoint(target_ckpt_path)
-            self.model.eval()
-
-            with torch.no_grad():
-                for local_step, batch in enumerate(dataloader):
-                    all_input = self.prepare_data(batch)
-                    output = self.model(**all_input)
-                    target_logits = output[1]
-                    target_labels = batch[2]
-                    break
-
-            #get source logits and cum KL_divergence
-            from task_list import QA_task_list
-            for task in QA_task_list:
-                source_ckpt_path = '/data/private/yijing/CrossFit_ensemble/models/full_data_adapter/'+task \
-                    +'-adapter_size_12-seed_42/lr_0.0005_bsz_16_seed_42/checkpoint-best.pt'
-                self.load_checkpoint(source_ckpt_path)
-                self.model.eval()
-
-                with torch.no_grad():
-                    for local_step, batch in enumerate(dataloader):
-                        all_input = self.prepare_data(batch)
-                        output = self.model(**all_input)
-                        source_logits = output[1]
-                        source_labels = batch[2]
-                        break
-
-                cos_sim = torch.nn.CosineSimilarity(dim=0, eps=1e-6)
-                cos_sum = 0
-                for i in range(len(target_labels)):
-                    if any(target_labels[i]==-100):
-                        j = int(torch.nonzero(target_labels[i]==-100).squeeze(1)[0])
-                        t_tensor = target_logits[i,0:j,:]
-                        s_tensor = source_logits[i,0:j,:]
-                        cos_sum += cos_sim(t_tensor.view(-1),s_tensor.view(-1))
-                    else:
-                        t_tensor = target_logits[i,:,:]
-                        s_tensor = source_logits[i,:,:]
-                        cos_sum += cos_sim(t_tensor.view(-1),s_tensor.view(-1))
-
-                with open('/home/lvxingtai/lxt/crossfit_yijing/result/adapter/qa_tasks/block/cos_last_label_all.tsv', 'a') as fout:
-                    fout.write(task+','+str(float(cos_sum))+'\n')
-        
-        if mode == 'dif':
-            import scipy.stats
-            import numpy
-
-            # for i in range(12):
-            #     with open('/home/lvxingtai/lxt/crossfit_yijing/checkpoints/adapter/qa_tasks/block_dif_tem10/dif_initial_data/encoder_block_'+str(i)+'.tsv', 'a') as fout:
-            #         fout.write(target_task+'\n')
-            #     with open('/home/lvxingtai/lxt/crossfit_yijing/checkpoints/adapter/qa_tasks/block_dif_tem10/dif_initial_data/decoder_block_'+str(i)+'.tsv', 'a') as fout:
-            #         fout.write(target_task+'\n')
-            # with open('/home/lvxingtai/lxt/crossfit_yijing/checkpoints/adapter/qa_tasks/block_dif_tem10/dif_initial_data/encoder.tsv', 'a') as fout:
-            #     fout.write(target_task+'\n')
-            # with open('/home/lvxingtai/lxt/crossfit_yijing/checkpoints/adapter/qa_tasks/block_dif_tem10/dif_initial_data/decoder.tsv', 'a') as fout:
-            #     fout.write(target_task+'\n')
-
-            dataloader = self.dev_data.dataloader
-
-            target_ckpt_path = '/home/lvxingtai/lxt/crossfit_yijing/checkpoints/adapter/qa_tasks/64_tune/'+target_task+'_best.pt'
-            self.load_checkpoint(target_ckpt_path)
-            self.model.eval()
-
-            with torch.no_grad():
-                for local_step, batch in enumerate(dataloader):
-                    all_input = self.prepare_data(batch)
-                    output = self.model(**all_input,output_hidden_states=True)
-                    target_encoder_hidden_states = output['encoder_hidden_states']
-                    target_decoder_hidden_states = output['decoder_hidden_states']
-                    break
-
-            from task_list import QA_task_list
-            for task in QA_task_list:
-                source_ckpt_path = '/data/private/yijing/CrossFit_ensemble/models/full_data_adapter/'+task \
-                    +'-adapter_size_12-seed_42/lr_0.0005_bsz_16_seed_42/checkpoint-best.pt'
-                self.load_checkpoint(source_ckpt_path)
-                self.model.eval()
-
-                with torch.no_grad():
-                    for local_step, batch in enumerate(dataloader):
-                        all_input = self.prepare_data(batch)
-                        output = self.model(**all_input,output_hidden_states=True)
-                        source_encoder_hidden_states = output['encoder_hidden_states']
-                        source_decoder_hidden_states = output['decoder_hidden_states']
-                        break
-
-                for i in range(12):
-                    dif_sum = torch.norm(target_encoder_hidden_states[i]-source_encoder_hidden_states[i])
-                    with open('/home/lvxingtai/lxt/crossfit_yijing/checkpoints/adapter/qa_tasks/block_dif_tem10/dif_initial_data/encoder_block_'+str(i)+'.tsv', 'a') as fout:
-                        fout.write(task+','+str(float(dif_sum))+'\n')
-
-                    dif_sum = torch.norm(target_decoder_hidden_states[i]-source_decoder_hidden_states[i])
-                    with open('/home/lvxingtai/lxt/crossfit_yijing/checkpoints/adapter/qa_tasks/block_dif_tem10/dif_initial_data/decoder_block_'+str(i)+'.tsv', 'a') as fout:
-                        fout.write(task+','+str(float(dif_sum))+'\n')
-                
-                dif_sum = torch.norm(target_encoder_hidden_states[12]-source_encoder_hidden_states[12])
-                with open('/home/lvxingtai/lxt/crossfit_yijing/checkpoints/adapter/qa_tasks/block_dif_tem10/dif_initial_data/encoder.tsv', 'a') as fout:
-                    fout.write(task+','+str(float(dif_sum))+'\n')
-            
-                dif_sum = torch.norm(target_decoder_hidden_states[12]-source_decoder_hidden_states[12])
-                with open('/home/lvxingtai/lxt/crossfit_yijing/checkpoints/adapter/qa_tasks/block_dif_tem10/dif_initial_data/encoder.tsv', 'a') as fout:
-                    fout.write(task+','+str(float(dif_sum))+'\n')
-
-        if mode == 'cos':
-            import scipy.stats
-            import numpy
-
-            for i in range(12):
-                with open('/home/lvxingtai/lxt/crossfit_yijing/checkpoints/adapter/qa_tasks/block_cos_tem/cos_initial_data/encoder_block_'+str(i)+'.tsv', 'a') as fout:
-                    fout.write(target_task+'\n')
-                with open('/home/lvxingtai/lxt/crossfit_yijing/checkpoints/adapter/qa_tasks/block_cos_tem/cos_initial_data/decoder_block_'+str(i)+'.tsv', 'a') as fout:
-                    fout.write(target_task+'\n')
-            with open('/home/lvxingtai/lxt/crossfit_yijing/checkpoints/adapter/qa_tasks/block_cos_tem/cos_initial_data/encoder.tsv', 'a') as fout:
-                fout.write(target_task+'\n')
-            with open('/home/lvxingtai/lxt/crossfit_yijing/checkpoints/adapter/qa_tasks/block_cos_tem/cos_initial_data/decoder.tsv', 'a') as fout:
-                fout.write(target_task+'\n')
-
-            dataloader = self.dev_data.dataloader
-            cos_sim = torch.nn.CosineSimilarity(dim=0, eps=1e-6)
-
-            target_ckpt_path = '/home/lvxingtai/lxt/crossfit_yijing/checkpoints/adapter/qa_tasks/64_tune/'+target_task+'_best.pt'
-            self.load_checkpoint(target_ckpt_path)
-            self.model.eval()
-
-            with torch.no_grad():
-                for local_step, batch in enumerate(dataloader):
-                    all_input = self.prepare_data(batch)
-                    output = self.model(**all_input,output_hidden_states=True)
-                    target_encoder_hidden_states = output['encoder_hidden_states']
-                    target_decoder_hidden_states = output['decoder_hidden_states']
-                    break
-
-            from task_list import QA_task_list
-            for task in QA_task_list:
-                source_ckpt_path = '/data/private/yijing/CrossFit_ensemble/models/full_data_adapter/'+task \
-                    +'-adapter_size_12-seed_42/lr_0.0005_bsz_16_seed_42/checkpoint-best.pt'
-                self.load_checkpoint(source_ckpt_path)
-                self.model.eval()
-
-                with torch.no_grad():
-                    for local_step, batch in enumerate(dataloader):
-                        all_input = self.prepare_data(batch)
-                        output = self.model(**all_input,output_hidden_states=True)
-                        source_encoder_hidden_states = output['encoder_hidden_states']
-                        source_decoder_hidden_states = output['decoder_hidden_states']
-                        break
-
-                for i in range(12):
-                    cos_sum = cos_sim(target_encoder_hidden_states[i].view(-1),source_encoder_hidden_states[i].view(-1))
-                    with open('/home/lvxingtai/lxt/crossfit_yijing/checkpoints/adapter/qa_tasks/block_cos_tem/cos_initial_data/encoder_block_'+str(i)+'.tsv', 'a') as fout:
-                        fout.write(task+','+str(float(cos_sum))+'\n')
-
-                    cos_sum = cos_sim(target_decoder_hidden_states[i].view(-1),source_decoder_hidden_states[i].view(-1))
-                    with open('/home/lvxingtai/lxt/crossfit_yijing/checkpoints/adapter/qa_tasks/block_cos_tem/cos_initial_data/decoder_block_'+str(i)+'.tsv', 'a') as fout:
-                        fout.write(task+','+str(float(cos_sum))+'\n')
-                
-                cos_sum = cos_sim(target_encoder_hidden_states[12].view(-1),source_encoder_hidden_states[12].view(-1))
-                with open('/home/lvxingtai/lxt/crossfit_yijing/checkpoints/adapter/qa_tasks/block_cos_tem/cos_initial_data/encoder.tsv', 'a') as fout:
-                    fout.write(task+','+str(float(cos_sum))+'\n')
-            
-                cos_sum = cos_sim(target_decoder_hidden_states[12].view(-1),source_decoder_hidden_states[12].view(-1))
-                with open('/home/lvxingtai/lxt/crossfit_yijing/checkpoints/adapter/qa_tasks/block_cos_tem/cos_initial_data/encoder.tsv', 'a') as fout:
-                    fout.write(task+','+str(float(cos_sum))+'\n')
-
-        if mode == 'decoder_dif_last':
-            with open('/home/lvxingtai/lxt/crossfit_yijing/result/adapter/qa_tasks/block/dif_decoder_labellast.tsv', 'a') as fout:
-                fout.write(target_task+'\n')
-            dataloader = self.dev_data.dataloader
-
-            #get target logits(use 64_tune ckpt)
-            target_ckpt_path = '/home/lvxingtai/lxt/crossfit_yijing/checkpoints/adapter/qa_tasks/64_tune/'+target_task+'_best.pt'
-            self.load_checkpoint(target_ckpt_path)
-            self.model.eval()
-
-            with torch.no_grad():
-                for local_step, batch in enumerate(dataloader):
-                    all_input = self.prepare_data(batch)
-                    output = self.model(**all_input,output_hidden_states=True)
-                    target_decoder_hidden_states = output['decoder_hidden_states']
-                    break
-
-            #get source logits and cum KL_divergence
-            from task_list import QA_task_list
-            for task in QA_task_list:
-                source_ckpt_path = '/data/private/yijing/CrossFit_ensemble/models/full_data_adapter/'+task \
-                    +'-adapter_size_12-seed_42/lr_0.0005_bsz_16_seed_42/checkpoint-best.pt'
-                self.load_checkpoint(source_ckpt_path)
-                self.model.eval()
-
-                with torch.no_grad():
-                    for local_step, batch in enumerate(dataloader):
-                        all_input = self.prepare_data(batch)
-                        output = self.model(**all_input,output_hidden_states=True)
-                        source_decoder_hidden_states = output['decoder_hidden_states']
-                        break
-
-                dif_sum = 0
-                for i in range(len(target_decoder_hidden_states[12])):
-                    dif_sum += torch.norm(target_decoder_hidden_states[12][i][63]-source_decoder_hidden_states[12][i][63])
-
-                with open('/home/lvxingtai/lxt/crossfit_yijing/result/adapter/qa_tasks/block/dif_decoder_labellast.tsv', 'a') as fout:
-                    fout.write(task+','+str(float(dif_sum))+'\n')
-
-        if mode == 'decoder_cos_last':
-            with open('/home/lvxingtai/lxt/crossfit_yijing/result/adapter/qa_tasks/block/cos_decoder_labellast.tsv', 'a') as fout:
-                fout.write(target_task+'\n')
-            dataloader = self.dev_data.dataloader
-
-            #get target logits(use 64_tune ckpt)
-            target_ckpt_path = '/home/lvxingtai/lxt/crossfit_yijing/checkpoints/adapter/qa_tasks/64_tune/'+target_task+'_best.pt'
-            self.load_checkpoint(target_ckpt_path)
-            self.model.eval()
-
-            with torch.no_grad():
-                for local_step, batch in enumerate(dataloader):
-                    all_input = self.prepare_data(batch)
-                    output = self.model(**all_input,output_hidden_states=True)
-                    target_decoder_hidden_states = output['decoder_hidden_states']
-                    break
-
-            #get source logits and cum KL_divergence
-            from task_list import QA_task_list
-            for task in QA_task_list:
-                source_ckpt_path = '/data/private/yijing/CrossFit_ensemble/models/full_data_adapter/'+task \
-                    +'-adapter_size_12-seed_42/lr_0.0005_bsz_16_seed_42/checkpoint-best.pt'
-                self.load_checkpoint(source_ckpt_path)
-                self.model.eval()
-
-                with torch.no_grad():
-                    for local_step, batch in enumerate(dataloader):
-                        all_input = self.prepare_data(batch)
-                        output = self.model(**all_input,output_hidden_states=True)
-                        source_decoder_hidden_states = output['decoder_hidden_states']
-                        break
-
-                cos_sim = torch.nn.CosineSimilarity(dim=0, eps=1e-6)
-                cos_sum = 0
-                for i in range(len(target_decoder_hidden_states[12])):
-                    cos_sum += cos_sim(target_decoder_hidden_states[12][i][63],source_decoder_hidden_states[12][i][63])
-
-                with open('/home/lvxingtai/lxt/crossfit_yijing/result/adapter/qa_tasks/block/cos_decoder_labellast.tsv', 'a') as fout:
-                    fout.write(task+','+str(float(cos_sum))+'\n')     
-
-        if mode == 'decoder_dif_label':
-            with open('/home/lvxingtai/lxt/crossfit_yijing/result/adapter/qa_tasks/block/dif_decoder_label.tsv', 'a') as fout:
-                fout.write(target_task+'\n')
-            dataloader = self.dev_data.dataloader
-
-            #get target logits(use 64_tune ckpt)
-            target_ckpt_path = '/data/private/lvxingtai/checkpoints_from_a100/adapter/qa_tasks/64_tune/'+target_task+'_best.pt'
-            self.load_checkpoint(target_ckpt_path)
-            self.model.eval()
-
-            with torch.no_grad():
-                for local_step, batch in enumerate(dataloader):
-                    all_input = self.prepare_data(batch)
-                    output = self.model(**all_input,output_hidden_states=True)
-                    target_decoder_hidden_states = output['decoder_hidden_states']
-                    target_labels = batch[2]
-                    break
-
-            #get source logits and cum KL_divergence
-            from task_list import QA_task_list
-            for task in QA_task_list:
-                source_ckpt_path = '/data/private/lvxingtai/delta_search_result/adapter_full_data_ckpt_from_yijing/'+task \
-                    +'/checkpoint-best.pt'
-                self.load_checkpoint(source_ckpt_path)
-                self.model.eval()
-
-                with torch.no_grad():
-                    for local_step, batch in enumerate(dataloader):
-                        all_input = self.prepare_data(batch)
-                        output = self.model(**all_input,output_hidden_states=True)
-                        source_decoder_hidden_states = output['decoder_hidden_states']
-                        break
-
-                dif_sum = 0
-                for i in range(len(target_labels)):
-                    if any(target_labels[i]==-100):
-                        j = int(torch.nonzero(target_labels[i]==-100).squeeze(1)[0])
-                        dif_sum += torch.norm(target_decoder_hidden_states[12][i,0:j,:]-source_decoder_hidden_states[12][i,0:j,:])
-                    else:
-                        dif_sum += torch.norm(target_decoder_hidden_states[12][i,:,:]-source_decoder_hidden_states[12][i,:,:])
-
-                with open('/home/lvxingtai/lxt/crossfit_yijing/result/adapter/qa_tasks/block/dif_decoder_label.tsv', 'a') as fout:
-                    fout.write(task+','+str(float(dif_sum))+'\n')
-
-        if mode == 'decoder_cos_label':
-            with open('/home/lvxingtai/lxt/crossfit_yijing/result/adapter/qa_tasks/block/cos_decoder_label.tsv', 'a') as fout:
-                fout.write(target_task+'\n')
-            dataloader = self.dev_data.dataloader
-
-            #get target logits(use 64_tune ckpt)
-            target_ckpt_path = '/data/private/lvxingtai/checkpoints_from_a100/adapter/qa_tasks/64_tune/'+target_task+'_best.pt'
-            self.load_checkpoint(target_ckpt_path)
-            self.model.eval()
-
-            with torch.no_grad():
-                for local_step, batch in enumerate(dataloader):
-                    all_input = self.prepare_data(batch)
-                    output = self.model(**all_input,output_hidden_states=True)
-                    target_decoder_hidden_states = output['decoder_hidden_states']
-                    target_labels = batch[2]
-                    break
-
-            #get source logits and cum KL_divergence
-            from task_list import QA_task_list
-            for task in QA_task_list:
-                source_ckpt_path = '/data/private/lvxingtai/delta_search_result/adapter_full_data_ckpt_from_yijing/'+task \
-                    +'/checkpoint-best.pt'
-                self.load_checkpoint(source_ckpt_path)
-                self.model.eval()
-
-                with torch.no_grad():
-                    for local_step, batch in enumerate(dataloader):
-                        all_input = self.prepare_data(batch)
-                        output = self.model(**all_input,output_hidden_states=True)
-                        source_decoder_hidden_states = output['decoder_hidden_states']
-                        break
-
-                cos_sim = torch.nn.CosineSimilarity(dim=0, eps=1e-6)
-                cos_sum = 0
-                for i in range(len(target_labels)):
-                    if any(target_labels[i]==-100):
-                        j = int(torch.nonzero(target_labels[i]==-100).squeeze(1)[0])
-                        t_tensor = target_decoder_hidden_states[12][i,0:j,:]
-                        s_tensor = source_decoder_hidden_states[12][i,0:j,:]
-                        cos_sum += cos_sim(t_tensor.view(-1),s_tensor.view(-1))
-                    else:
-                        t_tensor = target_decoder_hidden_states[12][i,:,:]
-                        s_tensor = source_decoder_hidden_states[12][i,:,:]
-                        cos_sum += cos_sim(t_tensor.view(-1),s_tensor.view(-1))
-
-                with open('/home/lvxingtai/lxt/crossfit_yijing/result/adapter/qa_tasks/block/cos_decoder_label.tsv', 'a') as fout:
-                    fout.write(task+','+str(float(cos_sum))+'\n') 
-
-        if mode == 'encoder_dif_withoutpad':
-            with open('/home/lvxingtai/lxt/crossfit_yijing/result/adapter/qa_tasks/block/dif_encoder_withoutpad.tsv', 'a') as fout:
-                fout.write(target_task+'\n')
-            dataloader = self.dev_data.dataloader
-
-            #get target logits(use 64_tune ckpt)
-            target_ckpt_path = '/data/private/lvxingtai/checkpoints_from_a100/adapter/qa_tasks/64_tune/'+target_task+'_best.pt'
-            self.load_checkpoint(target_ckpt_path)
-            self.model.eval()
-
-            with torch.no_grad():
-                for local_step, batch in enumerate(dataloader):
-                    all_input = self.prepare_data(batch)
-                    output = self.model(**all_input,output_hidden_states=True)
-                    target_encoder_hidden_states = output['encoder_hidden_states']
-                    target_attention_masks = batch[1]
-                    break
-
-            #get source logits and cum KL_divergence
-            from task_list import QA_task_list
-            for task in QA_task_list:
-                source_ckpt_path = '/data/private/lvxingtai/delta_search_result/adapter_full_data_ckpt_from_yijing/'+task \
-                    +'/checkpoint-best.pt'
-                self.load_checkpoint(source_ckpt_path)
-                self.model.eval()
-
-                with torch.no_grad():
-                    for local_step, batch in enumerate(dataloader):
-                        all_input = self.prepare_data(batch)
-                        output = self.model(**all_input,output_hidden_states=True)
-                        source_encoder_hidden_states = output['encoder_hidden_states']
-                        break
-
-                dif_sum = 0
-                for i in range(len(target_attention_masks)):
-                    if any(target_attention_masks[i]==0):
-                        j = int(torch.nonzero(target_attention_masks[i]==0).squeeze(1)[0])
-                        dif_sum += torch.norm(target_encoder_hidden_states[12][i,0:j,:]-source_encoder_hidden_states[12][i,0:j,:])
-                    else:
-                        dif_sum += torch.norm(target_encoder_hidden_states[12][i,:,:]-source_encoder_hidden_states[12][i,:,:])
-
-                with open('/home/lvxingtai/lxt/crossfit_yijing/result/adapter/qa_tasks/block/dif_encoder_withoutpad.tsv', 'a') as fout:
-                    fout.write(task+','+str(float(dif_sum))+'\n')
-
-        if mode == 'encoder_cos_withoutpad':
-            with open('/home/lvxingtai/lxt/crossfit_yijing/result/adapter/qa_tasks/block/cos_encoder_withoutpad.tsv', 'a') as fout:
-                fout.write(target_task+'\n')
-            dataloader = self.dev_data.dataloader
-
-            #get target logits(use 64_tune ckpt)
-            target_ckpt_path = '/data/private/lvxingtai/checkpoints_from_a100/adapter/qa_tasks/64_tune/'+target_task+'_best.pt'
-            self.load_checkpoint(target_ckpt_path)
-            self.model.eval()
-
-            with torch.no_grad():
-                for local_step, batch in enumerate(dataloader):
-                    all_input = self.prepare_data(batch)
-                    output = self.model(**all_input,output_hidden_states=True)
-                    target_encoder_hidden_states = output['encoder_hidden_states']
-                    target_attention_masks = batch[1]
-                    break
-
-            #get source logits and cum KL_divergence
-            from task_list import QA_task_list
-            for task in QA_task_list:
-                source_ckpt_path = '/data/private/lvxingtai/delta_search_result/adapter_full_data_ckpt_from_yijing/'+task \
-                    +'/checkpoint-best.pt'
-                self.load_checkpoint(source_ckpt_path)
-                self.model.eval()
-
-                with torch.no_grad():
-                    for local_step, batch in enumerate(dataloader):
-                        all_input = self.prepare_data(batch)
-                        output = self.model(**all_input,output_hidden_states=True)
-                        source_encoder_hidden_states = output['encoder_hidden_states']
-                        break
-
-                cos_sim = torch.nn.CosineSimilarity(dim=0, eps=1e-6)
-                cos_sum = 0
-                for i in range(len(target_attention_masks)):
-                    if any(target_attention_masks[i]==0):
-                        j = int(torch.nonzero(target_attention_masks[i]==0).squeeze(1)[0])
-                        t_tensor = target_encoder_hidden_states[12][i,0:j,:]
-                        s_tensor = source_encoder_hidden_states[12][i,0:j,:]
-                        cos_sum += cos_sim(t_tensor.view(-1),s_tensor.view(-1))
-                    else:
-                        t_tensor = target_encoder_hidden_states[12][i,:,:]
-                        s_tensor = source_encoder_hidden_states[12][i,:,:]
-                        cos_sum += cos_sim(t_tensor.view(-1),s_tensor.view(-1))
-
-                with open('/home/lvxingtai/lxt/crossfit_yijing/result/adapter/qa_tasks/block/cos_encoder_withoutpad.tsv', 'a') as fout:
-                    fout.write(task+','+str(float(cos_sum))+'\n')
-
-        if mode == 'encoder_dif_first':
-            with open('/home/lvxingtai/lxt/crossfit_yijing/result/adapter/qa_tasks/block/dif_encoder_first.tsv', 'a') as fout:
-                fout.write(target_task+'\n')
-            dataloader = self.dev_data.dataloader
-
-            #get target logits(use 64_tune ckpt)
-            target_ckpt_path = '/data/private/lvxingtai/checkpoints_from_a100/adapter/qa_tasks/64_tune/'+target_task+'_best.pt'
-            self.load_checkpoint(target_ckpt_path)
-            self.model.eval()
-
-            with torch.no_grad():
-                for local_step, batch in enumerate(dataloader):
-                    all_input = self.prepare_data(batch)
-                    output = self.model(**all_input,output_hidden_states=True)
-                    target_encoder_hidden_states = output['encoder_hidden_states']
-                    break
-
-            #get source logits and cum KL_divergence
-            from task_list import QA_task_list
-            for task in QA_task_list:
-                source_ckpt_path = '/data/private/lvxingtai/delta_search_result/adapter_full_data_ckpt_from_yijing/'+task \
-                    +'/checkpoint-best.pt'
-                self.load_checkpoint(source_ckpt_path)
-                self.model.eval()
-
-                with torch.no_grad():
-                    for local_step, batch in enumerate(dataloader):
-                        all_input = self.prepare_data(batch)
-                        output = self.model(**all_input,output_hidden_states=True)
-                        source_encoder_hidden_states = output['encoder_hidden_states']
-                        break
-
-                dif_sum = 0
-                for i in range(len(target_encoder_hidden_states[12])):
-                    dif_sum += torch.norm(target_encoder_hidden_states[12][i][0]-source_encoder_hidden_states[12][i][0])
-
-                with open('/home/lvxingtai/lxt/crossfit_yijing/result/adapter/qa_tasks/block/dif_encoder_first.tsv', 'a') as fout:
-                    fout.write(task+','+str(float(dif_sum))+'\n')
-
-        if mode == 'encoder_cos_first':
-            with open('/home/lvxingtai/lxt/crossfit_yijing/result/adapter/qa_tasks/block/cos_encoder_first.tsv', 'a') as fout:
-                fout.write(target_task+'\n')
-            dataloader = self.dev_data.dataloader
-
-            #get target logits(use 64_tune ckpt)
-            target_ckpt_path = '/data/private/lvxingtai/checkpoints_from_a100/adapter/qa_tasks/64_tune/'+target_task+'_best.pt'
-            self.load_checkpoint(target_ckpt_path)
-            self.model.eval()
-
-            with torch.no_grad():
-                for local_step, batch in enumerate(dataloader):
-                    all_input = self.prepare_data(batch)
-                    output = self.model(**all_input,output_hidden_states=True)
-                    target_encoder_hidden_states = output['encoder_hidden_states']
-                    break
-
-            #get source logits and cum KL_divergence
-            from task_list import QA_task_list
-            for task in QA_task_list:
-                source_ckpt_path = '/data/private/lvxingtai/delta_search_result/adapter_full_data_ckpt_from_yijing/'+task \
-                    +'/checkpoint-best.pt'
-                self.load_checkpoint(source_ckpt_path)
-                self.model.eval()
-
-                with torch.no_grad():
-                    for local_step, batch in enumerate(dataloader):
-                        all_input = self.prepare_data(batch)
-                        output = self.model(**all_input,output_hidden_states=True)
-                        source_encoder_hidden_states = output['encoder_hidden_states']
-                        break
-
-                cos_sim = torch.nn.CosineSimilarity(dim=0, eps=1e-6)
-                cos_sum = 0
-                for i in range(len(target_encoder_hidden_states[12])):
-                    cos_sum += cos_sim(target_encoder_hidden_states[12][i][0],source_encoder_hidden_states[12][i][0])
-
-                with open('/home/lvxingtai/lxt/crossfit_yijing/result/adapter/qa_tasks/block/cos_encoder_first.tsv', 'a') as fout:
-                    fout.write(task+','+str(float(cos_sum))+'\n')
-
-        if mode == 'decoder_dif_first':
-            with open('/home/lvxingtai/lxt/crossfit_yijing/result/adapter/qa_tasks/block/dif_decoder_first.tsv', 'a') as fout:
-                fout.write(target_task+'\n')
-            dataloader = self.dev_data.dataloader
-
-            #get target logits(use 64_tune ckpt)
-            target_ckpt_path = '/data/private/lvxingtai/checkpoints_from_a100/adapter/qa_tasks/64_tune/'+target_task+'_best.pt'
-            self.load_checkpoint(target_ckpt_path)
-            self.model.eval()
-
-            with torch.no_grad():
-                for local_step, batch in enumerate(dataloader):
-                    all_input = self.prepare_data(batch)
-                    output = self.model(**all_input,output_hidden_states=True)
-                    target_decoder_hidden_states = output['decoder_hidden_states']
-                    break
-
-            #get source logits and cum KL_divergence
-            from task_list import QA_task_list
-            for task in QA_task_list:
-                source_ckpt_path = '/data/private/lvxingtai/delta_search_result/adapter_full_data_ckpt_from_yijing/'+task \
-                    +'/checkpoint-best.pt'
-                self.load_checkpoint(source_ckpt_path)
-                self.model.eval()
-
-                with torch.no_grad():
-                    for local_step, batch in enumerate(dataloader):
-                        all_input = self.prepare_data(batch)
-                        output = self.model(**all_input,output_hidden_states=True)
-                        source_decoder_hidden_states = output['decoder_hidden_states']
-                        break
-
-                dif_sum = 0
-                for i in range(len(target_decoder_hidden_states[12])):
-                    dif_sum += torch.norm(target_decoder_hidden_states[12][i][0]-source_decoder_hidden_states[12][i][0])
-
-                with open('/home/lvxingtai/lxt/crossfit_yijing/result/adapter/qa_tasks/block/dif_decoder_first.tsv', 'a') as fout:
-                    fout.write(task+','+str(float(dif_sum))+'\n')
-
-        if mode == 'decoder_cos_first':
-            with open('/home/lvxingtai/lxt/crossfit_yijing/result/adapter/qa_tasks/block/cos_decoder_first.tsv', 'a') as fout:
-                fout.write(target_task+'\n')
-            dataloader = self.dev_data.dataloader
-
-            #get target logits(use 64_tune ckpt)
-            target_ckpt_path = '/data/private/lvxingtai/checkpoints_from_a100/adapter/qa_tasks/64_tune/'+target_task+'_best.pt'
-            self.load_checkpoint(target_ckpt_path)
-            self.model.eval()
-
-            with torch.no_grad():
-                for local_step, batch in enumerate(dataloader):
-                    all_input = self.prepare_data(batch)
-                    output = self.model(**all_input,output_hidden_states=True)
-                    target_decoder_hidden_states = output['decoder_hidden_states']
-                    break
-
-            #get source logits and cum KL_divergence
-            from task_list import QA_task_list
-            for task in QA_task_list:
-                source_ckpt_path = '/data/private/lvxingtai/delta_search_result/adapter_full_data_ckpt_from_yijing/'+task \
-                    +'/checkpoint-best.pt'
-                self.load_checkpoint(source_ckpt_path)
-                self.model.eval()
-
-                with torch.no_grad():
-                    for local_step, batch in enumerate(dataloader):
-                        all_input = self.prepare_data(batch)
-                        output = self.model(**all_input,output_hidden_states=True)
-                        source_decoder_hidden_states = output['decoder_hidden_states']
-                        break
-
-                cos_sim = torch.nn.CosineSimilarity(dim=0, eps=1e-6)
-                cos_sum = 0
-                for i in range(len(target_decoder_hidden_states[12])):
-                    cos_sum += cos_sim(target_decoder_hidden_states[12][i][0],source_decoder_hidden_states[12][i][0])
-
-                with open('/home/lvxingtai/lxt/crossfit_yijing/result/adapter/qa_tasks/block/cos_decoder_first.tsv', 'a') as fout:
-                    fout.write(task+','+str(float(cos_sum))+'\n')
-
-        if mode == 'encoder_dif_all':
-            with open('/home/lvxingtai/lxt/crossfit_yijing/result/adapter/qa_tasks/block/dif_encoder_all.tsv', 'a') as fout:
-                fout.write(target_task+'\n')
-            dataloader = self.dev_data.dataloader
-
-            #get target logits(use 64_tune ckpt)
-            target_ckpt_path = '/data/private/lvxingtai/checkpoints_from_a100/adapter/qa_tasks/64_tune/'+target_task+'_best.pt'
-            self.load_checkpoint(target_ckpt_path)
-            self.model.eval()
-
-            with torch.no_grad():
-                for local_step, batch in enumerate(dataloader):
-                    all_input = self.prepare_data(batch)
-                    output = self.model(**all_input,output_hidden_states=True)
-                    target_encoder_hidden_states = output['encoder_hidden_states']
-                    break
-
-            #get source logits and cum KL_divergence
-            from task_list import QA_task_list
-            for task in QA_task_list:
-                source_ckpt_path = '/data/private/lvxingtai/delta_search_result/adapter_full_data_ckpt_from_yijing/'+task \
-                    +'/checkpoint-best.pt'
-                self.load_checkpoint(source_ckpt_path)
-                self.model.eval()
-
-                with torch.no_grad():
-                    for local_step, batch in enumerate(dataloader):
-                        all_input = self.prepare_data(batch)
-                        output = self.model(**all_input,output_hidden_states=True)
-                        source_encoder_hidden_states = output['encoder_hidden_states']
-                        break
-
-                dif_sum = 0
-                for i in range(len(target_encoder_hidden_states[12])):
-                    dif_sum += torch.norm(target_encoder_hidden_states[12][i]-source_encoder_hidden_states[12][i])
-
-                with open('/home/lvxingtai/lxt/crossfit_yijing/result/adapter/qa_tasks/block/dif_encoder_all.tsv', 'a') as fout:
-                    fout.write(task+','+str(float(dif_sum))+'\n')
-
-        if mode == 'encoder_cos_all':
-            with open('/home/lvxingtai/lxt/crossfit_yijing/result/adapter/qa_tasks/block/cos_encoder_all.tsv', 'a') as fout:
-                fout.write(target_task+'\n')
-            dataloader = self.dev_data.dataloader
-
-            #get target logits(use 64_tune ckpt)
-            target_ckpt_path = '/data/private/lvxingtai/checkpoints_from_a100/adapter/qa_tasks/64_tune/'+target_task+'_best.pt'
-            self.load_checkpoint(target_ckpt_path)
-            self.model.eval()
-
-            with torch.no_grad():
-                for local_step, batch in enumerate(dataloader):
-                    all_input = self.prepare_data(batch)
-                    output = self.model(**all_input,output_hidden_states=True)
-                    target_encoder_hidden_states = output['encoder_hidden_states']
-                    break
-
-            #get source logits and cum KL_divergence
-            from task_list import QA_task_list
-            for task in QA_task_list:
-                source_ckpt_path = '/data/private/lvxingtai/delta_search_result/adapter_full_data_ckpt_from_yijing/'+task \
-                    +'/checkpoint-best.pt'
-                self.load_checkpoint(source_ckpt_path)
-                self.model.eval()
-
-                with torch.no_grad():
-                    for local_step, batch in enumerate(dataloader):
-                        all_input = self.prepare_data(batch)
-                        output = self.model(**all_input,output_hidden_states=True)
-                        source_encoder_hidden_states = output['encoder_hidden_states']
-                        break
-
-                cos_sim = torch.nn.CosineSimilarity(dim=0, eps=1e-6)
-                cos_sum = 0
-                for i in range(len(target_encoder_hidden_states[12])):
-                    cos_sum += cos_sim(target_encoder_hidden_states[12][i].view(-1),source_encoder_hidden_states[12][i].view(-1))
-
-                with open('/home/lvxingtai/lxt/crossfit_yijing/result/adapter/qa_tasks/block/cos_encoder_all.tsv', 'a') as fout:
-                    fout.write(task+','+str(float(cos_sum))+'\n')
-
-        if mode == 'decoder_dif_all':
-            with open('/home/lvxingtai/lxt/crossfit_yijing/result/adapter/qa_tasks/block/dif_decoder_all.tsv', 'a') as fout:
-                fout.write(target_task+'\n')
-            dataloader = self.dev_data.dataloader
-
-            #get target logits(use 64_tune ckpt)
-            target_ckpt_path = '/data/private/lvxingtai/checkpoints_from_a100/adapter/qa_tasks/64_tune/'+target_task+'_best.pt'
-            self.load_checkpoint(target_ckpt_path)
-            self.model.eval()
-
-            with torch.no_grad():
-                for local_step, batch in enumerate(dataloader):
-                    all_input = self.prepare_data(batch)
-                    output = self.model(**all_input,output_hidden_states=True)
-                    target_decoder_hidden_states = output['decoder_hidden_states']
-                    break
-
-            #get source logits and cum KL_divergence
-            from task_list import QA_task_list
-            for task in QA_task_list:
-                source_ckpt_path = '/data/private/lvxingtai/delta_search_result/adapter_full_data_ckpt_from_yijing/'+task \
-                    +'/checkpoint-best.pt'
-                self.load_checkpoint(source_ckpt_path)
-                self.model.eval()
-
-                with torch.no_grad():
-                    for local_step, batch in enumerate(dataloader):
-                        all_input = self.prepare_data(batch)
-                        output = self.model(**all_input,output_hidden_states=True)
-                        source_decoder_hidden_states = output['decoder_hidden_states']
-                        break
-
-                dif_sum = 0
-                for i in range(len(target_decoder_hidden_states[12])):
-                    dif_sum += torch.norm(target_decoder_hidden_states[12][i]-source_decoder_hidden_states[12][i])
-
-                with open('/home/lvxingtai/lxt/crossfit_yijing/result/adapter/qa_tasks/block/dif_decoder_all.tsv', 'a') as fout:
-                    fout.write(task+','+str(float(dif_sum))+'\n')
-
-        if mode == 'decoder_cos_all':
-            with open('/home/lvxingtai/lxt/crossfit_yijing/result/adapter/qa_tasks/block/cos_decoder_all.tsv', 'a') as fout:
-                fout.write(target_task+'\n')
-            dataloader = self.dev_data.dataloader
-
-            #get target logits(use 64_tune ckpt)
-            target_ckpt_path = '/data/private/lvxingtai/checkpoints_from_a100/adapter/qa_tasks/64_tune/'+target_task+'_best.pt'
-            self.load_checkpoint(target_ckpt_path)
-            self.model.eval()
-
-            with torch.no_grad():
-                for local_step, batch in enumerate(dataloader):
-                    all_input = self.prepare_data(batch)
-                    output = self.model(**all_input,output_hidden_states=True)
-                    target_decoder_hidden_states = output['decoder_hidden_states']
-                    break
-
-            #get source logits and cum KL_divergence
-            from task_list import QA_task_list
-            for task in QA_task_list:
-                source_ckpt_path = '/data/private/lvxingtai/delta_search_result/adapter_full_data_ckpt_from_yijing/'+task \
-                    +'/checkpoint-best.pt'
-                self.load_checkpoint(source_ckpt_path)
-                self.model.eval()
-
-                with torch.no_grad():
-                    for local_step, batch in enumerate(dataloader):
-                        all_input = self.prepare_data(batch)
-                        output = self.model(**all_input,output_hidden_states=True)
-                        source_decoder_hidden_states = output['decoder_hidden_states']
-                        break
-
-                cos_sim = torch.nn.CosineSimilarity(dim=0, eps=1e-6)
-                cos_sum = 0
-                for i in range(len(target_decoder_hidden_states[12])):
-                    cos_sum += cos_sim(target_decoder_hidden_states[12][i].view(-1),source_decoder_hidden_states[12][i].view(-1))
-
-                with open('/home/lvxingtai/lxt/crossfit_yijing/result/adapter/qa_tasks/block/cos_decoder_all.tsv', 'a') as fout:
-                    fout.write(task+','+str(float(cos_sum))+'\n')
-
-        if mode == 'dif_withoutpad':
-            for i in range(12):
-                with open('/home/lvxingtai/lxt/crossfit_yijing/result/adapter/qa_tasks/block/dif_withoutpad/encoder_block_'+str(i)+'_result.tsv', 'a') as fout:
-                    fout.write(target_task+'\n')
-                with open('/home/lvxingtai/lxt/crossfit_yijing/result/adapter/qa_tasks/block/dif_withoutpad/decoder_block_'+str(i)+'_result.tsv', 'a') as fout:
+                with open(self.args.output_dir+'/decoder_block_'+str(i)+'_result.tsv', 'a') as fout:
                     fout.write(target_task+'\n')
 
             dataloader = self.dev_data.dataloader
+            self.logger.info("Begin test on {:d} samples ...".format(len(self.dev_data.dataset)))
+
             #get target logits(use 64_tune ckpt)
-            target_ckpt_path = '/home/lvxingtai/lxt/crossfit_yijing/checkpoints/adapter/qa_tasks/64_tune/'+target_task+'_best.pt'
+            target_ckpt_path = self.args.random_tuned_ckpt_path + '/' + target_task + '/checkpoint-best.pt'
+
             self.load_checkpoint(target_ckpt_path)
             self.model.eval()
 
@@ -1825,9 +764,8 @@ class Trainer:
             #get source logits and cum KL_divergence
             from task_list import QA_task_list
             for task in QA_task_list:
-                source_ckpt_path = '/data/private/yijing/CrossFit_ensemble/models/full_data_adapter/'+task \
-                    +'-adapter_size_12-seed_42/lr_0.0005_bsz_16_seed_42/checkpoint-best.pt'
-                self.load_checkpoint(source_ckpt_path)
+                source_checkpoint = self.args.source_checkpoint_path + '/' + task + '/checkpoint-best.pt'
+                self.load_checkpoint(source_checkpoint)
                 self.model.eval()
 
                 with torch.no_grad():
@@ -1838,30 +776,40 @@ class Trainer:
                         source_decoder_hidden_states = output['decoder_hidden_states']
                         break
 
-                dif_sum_list = [0 for i in range(24)]
+                cos_sum_list = [0 for i in range(24)]
+                cos_sim = torch.nn.CosineSimilarity(dim=0, eps=1e-6)
+
                 for i in range(len(target_attention_masks)):
                     if any(target_attention_masks[i]==0):
                         j = int(torch.nonzero(target_attention_masks[i]==0).squeeze(1)[0])
                         for block_num in range(12):
-                            dif_sum_list[block_num] += torch.norm(target_encoder_hidden_states[block_num][i,0:j,:]-source_encoder_hidden_states[block_num][i,0:j,:])
+                            t_tensor = target_encoder_hidden_states[block_num][i,0:j,:]
+                            s_tensor = source_encoder_hidden_states[block_num][i,0:j,:]
+                            cos_sum_list[block_num] += cos_sim(t_tensor.view(-1),s_tensor.view(-1))
                     else:
                         for block_num in range(12):
-                            dif_sum_list[block_num] += torch.norm(target_encoder_hidden_states[block_num][i,:,:]-source_encoder_hidden_states[block_num][i,:,:])
+                            t_tensor = target_encoder_hidden_states[block_num][i,:,:]
+                            s_tensor = source_encoder_hidden_states[block_num][i,:,:]
+                            cos_sum_list[block_num] += cos_sim(t_tensor.view(-1),s_tensor.view(-1))
 
                 for i in range(len(target_labels)):
                     if any(target_labels[i]==-100):
                         j = int(torch.nonzero(target_labels[i]==-100).squeeze(1)[0])
                         for block_num in range(12):
-                            dif_sum_list[block_num+12] += torch.norm(target_decoder_hidden_states[block_num][i,0:j,:]-source_decoder_hidden_states[block_num][i,0:j,:])
+                            t_tensor = target_decoder_hidden_states[block_num][i,0:j,:]
+                            s_tensor = source_decoder_hidden_states[block_num][i,0:j,:]
+                            cos_sum_list[block_num+12] += cos_sim(t_tensor.view(-1),s_tensor.view(-1))
                     else:
                         for block_num in range(12):
-                            dif_sum_list[block_num+12] += torch.norm(target_decoder_hidden_states[block_num][i,:,:]-source_decoder_hidden_states[block_num][i,:,:])
+                            t_tensor = target_decoder_hidden_states[block_num][i,:,:]
+                            s_tensor = source_decoder_hidden_states[block_num][i,:,:]
+                            cos_sum_list[block_num+12] += cos_sim(t_tensor.view(-1),s_tensor.view(-1))
 
                 for i in range(12):
-                    with open('/home/lvxingtai/lxt/crossfit_yijing/result/adapter/qa_tasks/block/dif_withoutpad/encoder_block_'+str(i)+'_result.tsv', 'a') as fout:
-                        fout.write(task+','+str(float(dif_sum_list[i]))+'\n')
-                    with open('/home/lvxingtai/lxt/crossfit_yijing/result/adapter/qa_tasks/block/dif_withoutpad/decoder_block_'+str(i)+'_result.tsv', 'a') as fout:
-                        fout.write(task+','+str(float(dif_sum_list[i+12]))+'\n')
+                    with open(self.args.output_dir+'/encoder_block_'+str(i)+'_result.tsv', 'a') as fout:
+                        fout.write(task+','+str(float(cos_sum_list[i]))+'\n')
+                    with open(self.args.output_dir+'/decoder_block_'+str(i)+'_result.tsv', 'a') as fout:
+                        fout.write(task+','+str(float(cos_sum_list[i+12]))+'\n')
 
 
     def get_EL2N(self):
@@ -1956,15 +904,15 @@ class Trainer:
         if mode == 'layer':
             #单独计算每个layer的结果，没有叠加
             for i in range(12):
-                with open('/home/lvxingtai/lxt/crossfit_yijing/result/adapter/qa_tasks/GraNd/encoder_block_'+str(i)+'_layer_0_result.tsv', 'a') as fout:
+                with open(self.args.output_dir+'/encoder_block_'+str(i)+'_layer_0_result.tsv', 'a') as fout:
                     fout.write(target_task+'\n')
-                with open('/home/lvxingtai/lxt/crossfit_yijing/result/adapter/qa_tasks/GraNd/encoder_block_'+str(i)+'_layer_1_result.tsv', 'a') as fout:
+                with open(self.args.output_dir+'/encoder_block_'+str(i)+'_layer_1_result.tsv', 'a') as fout:
                     fout.write(target_task+'\n')
-                with open('/home/lvxingtai/lxt/crossfit_yijing/result/adapter/qa_tasks/GraNd/decoder_block_'+str(i)+'_layer_0_result.tsv', 'a') as fout:
+                with open(self.args.output_dir+'/decoder_block_'+str(i)+'_layer_0_result.tsv', 'a') as fout:
                     fout.write(target_task+'\n')
-                with open('/home/lvxingtai/lxt/crossfit_yijing/result/adapter/qa_tasks/GraNd/decoder_block_'+str(i)+'_layer_1_result.tsv', 'a') as fout:
+                with open(self.args.output_dir+'/decoder_block_'+str(i)+'_layer_1_result.tsv', 'a') as fout:
                     fout.write(target_task+'\n')
-                with open('/home/lvxingtai/lxt/crossfit_yijing/result/adapter/qa_tasks/GraNd/decoder_block_'+str(i)+'_layer_2_result.tsv', 'a') as fout:
+                with open(self.args.output_dir+'/decoder_block_'+str(i)+'_layer_2_result.tsv', 'a') as fout:
                     fout.write(target_task+'\n')
             if target_task in ['boolq','mc_taco',]:
                 cou_num = 3
@@ -1972,12 +920,12 @@ class Trainer:
                 cou_num = 5 
 
             dataloader = self.dev_data.dataloader
+            self.logger.info("Begin test on {:d} samples ...".format(len(self.dev_data.dataset)))
 
             from task_list import QA_task_list
             for task in QA_task_list:
-                source_ckpt_path = '/data/private/lvxingtai/delta_search_result/adapter_full_data_ckpt_from_yijing/'+task \
-                    +'/checkpoint-best.pt'
-                self.load_checkpoint(source_ckpt_path)
+                source_checkpoint = self.args.source_checkpoint_path+'/'+task+'/checkpoint-best.pt'
+                self.load_checkpoint(source_checkpoint)
 
                 self.model.train()
                 optimizer_grouped_parameters, to_update_parameters = self.get_optimzied_group()
@@ -2007,23 +955,23 @@ class Trainer:
                         break
 
                 for i in range(12):
-                    with open('/home/lvxingtai/lxt/crossfit_yijing/result/adapter/qa_tasks/GraNd/encoder_block_'+str(i)+'_layer_0_result.tsv', 'a') as fout:
+                    with open(self.args.output_dir+'/encoder_block_'+str(i)+'_layer_0_result.tsv', 'a') as fout:
                         fout.write(task+','+str(float(GraNd_sum_list[2*i]))+'\n')
-                    with open('/home/lvxingtai/lxt/crossfit_yijing/result/adapter/qa_tasks/GraNd/encoder_block_'+str(i)+'_layer_1_result.tsv', 'a') as fout:
+                    with open(self.args.output_dir+'/encoder_block_'+str(i)+'_layer_1_result.tsv', 'a') as fout:
                         fout.write(task+','+str(float(GraNd_sum_list[2*i+1]))+'\n')
-                    with open('/home/lvxingtai/lxt/crossfit_yijing/result/adapter/qa_tasks/GraNd/decoder_block_'+str(i)+'_layer_0_result.tsv', 'a') as fout:
+                    with open(self.args.output_dir+'/decoder_block_'+str(i)+'_layer_0_result.tsv', 'a') as fout:
                         fout.write(task+','+str(float(GraNd_sum_list[24+3*i]))+'\n')
-                    with open('/home/lvxingtai/lxt/crossfit_yijing/result/adapter/qa_tasks/GraNd/decoder_block_'+str(i)+'_layer_1_result.tsv', 'a') as fout:
+                    with open(self.args.output_dir+'/decoder_block_'+str(i)+'_layer_1_result.tsv', 'a') as fout:
                         fout.write(task+','+str(float(GraNd_sum_list[25+3*i]))+'\n')
-                    with open('/home/lvxingtai/lxt/crossfit_yijing/result/adapter/qa_tasks/GraNd/decoder_block_'+str(i)+'_layer_2_result.tsv', 'a') as fout:
+                    with open(self.args.output_dir+'/decoder_block_'+str(i)+'_layer_2_result.tsv', 'a') as fout:
                         fout.write(task+','+str(float(GraNd_sum_list[26+3*i]))+'\n')
         
         elif mode == 'block':
             #单独计算每个block的结果，没有叠加
             for i in range(12):
-                with open('/home/lvxingtai/lxt/crossfit_yijing/result/adapter/qa_tasks/GraNd/encoder_block_'+str(i)+'_result.tsv', 'a') as fout:
+                with open(self.args.output_dir+'/encoder_block_'+str(i)+'_result.tsv', 'a') as fout:
                     fout.write(target_task+'\n')
-                with open('/home/lvxingtai/lxt/crossfit_yijing/result/adapter/qa_tasks/GraNd/decoder_block_'+str(i)+'_result.tsv', 'a') as fout:
+                with open(self.args.output_dir+'/decoder_block_'+str(i)+'_result.tsv', 'a') as fout:
                     fout.write(target_task+'\n')
             if target_task in ['boolq','mc_taco',]:
                 cou_num = 3
@@ -2031,12 +979,12 @@ class Trainer:
                 cou_num = 5 
 
             dataloader = self.dev_data.dataloader
+            self.logger.info("Begin test on {:d} samples ...".format(len(self.dev_data.dataset)))
 
             from task_list import QA_task_list
             for task in QA_task_list:
-                source_ckpt_path = '/data/private/yijing/CrossFit_ensemble/models/full_data_adapter/'+task \
-                    +'-adapter_size_12-seed_42/lr_0.0005_bsz_16_seed_42/checkpoint-best.pt'
-                self.load_checkpoint(source_ckpt_path)
+                source_checkpoint = self.args.source_checkpoint_path+'/'+task+'/checkpoint-best.pt'
+                self.load_checkpoint(source_checkpoint)
 
                 self.model.train()
                 optimizer_grouped_parameters, to_update_parameters = self.get_optimzied_group()
@@ -2067,9 +1015,9 @@ class Trainer:
                         break
 
                 for i in range(12):
-                    with open('/home/lvxingtai/lxt/crossfit_yijing/result/adapter/qa_tasks/GraNd/encoder_block_'+str(i)+'_result.tsv', 'a') as fout:
+                    with open(self.args.output_dir+'/encoder_block_'+str(i)+'_result.tsv', 'a') as fout:
                         fout.write(task+','+str(float(GraNd_sum_list[i]))+'\n')
-                    with open('/home/lvxingtai/lxt/crossfit_yijing/result/adapter/qa_tasks/GraNd/decoder_block_'+str(i)+'_result.tsv', 'a') as fout:
+                    with open(self.args.output_dir+'/decoder_block_'+str(i)+'_result.tsv', 'a') as fout:
                         fout.write(task+','+str(float(GraNd_sum_list[i+12]))+'\n')
 
         elif mode == 'dev':
@@ -2088,9 +1036,12 @@ class Trainer:
 
             #load data
             dataloader = self.dev_data.dataloader
+            self.logger.info("Begin test on {:d} samples ...".format(len(self.dev_data.dataset)))
 
             from task_list import QA_task_list as TASK_LIST
             for task in TASK_LIST:
+                with open(self.args.output_dir+'/result.tsv', 'a') as fout:
+                    fout.write(task + '\n')
                 source_checkpoint = self.args.source_checkpoint_path+'/'+task+'/checkpoint-best.pt'
                 self.load_checkpoint(source_checkpoint)
 

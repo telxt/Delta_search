@@ -1,7 +1,7 @@
 cd ../../get_similarity
 
 CUDA_VISIBLE_DEVICES=2 \
-python get_Loss.py \
+python get_GraNd.py \
 --do_train \
 --do_predict \
 --learning_rate_list 5e-4 \

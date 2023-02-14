@@ -85,6 +85,7 @@ def main():
     parser.add_argument("--train_checkpoint", default=None, required=False)
     parser.add_argument("--test_checkpoint", default=None, required=False)
     parser.add_argument("--source_checkpoint_path", default=None, required=False)
+    parser.add_argument("--random_tuned_ckpt_path", default=None, required=False)
     parser.add_argument("--tokenizer_path", default="facebook/t5-base", required=False)
     
     parser.add_argument("--output_dir", default=None, type=str, required=True)
@@ -275,12 +276,9 @@ def main():
                     else:
                         args.train_batch_size = bsz
                         args.gradient_accumulation_steps = 1
-
+                    
                     trainer = Trainer(args, logger, model_provider)
-
-                    trainer.get_GraNd(target_task=task, mode='dev')
-                    # trainer.get_GraNd(target_task=task, mode='block')
-                    # trainer.get_GraNd(target_task=task, mode='layer')
+                    trainer.get_block(target_task=task, mode='cos_withoutpad')
 
 if __name__=='__main__':
     main()
