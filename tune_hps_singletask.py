@@ -19,6 +19,7 @@ from __future__ import print_function
 
 from task_list import QA_task_list as TASK_LIST
 
+
 import os
 import sys
 import argparse
