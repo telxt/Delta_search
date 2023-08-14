@@ -1,24 +1,13 @@
-# 一些问题
+<div align="center">
 
-- 数据集需要列上去吗
-- 许多代码是照抄crossfit的，需不需要说明一下
-- 已经验证了Loss的结果和原始实验一模一样，还需要验证其他的吗
+<h1>Parameter-efficient Weight Ensembling Facilitates Task-level Knowledge Transfer</h1>
 
+</div>
 
-
-
-
-# To do list
-
-- 修改t5-train.py
-- 最后删除result文件夹和checkpoint文件夹
-- 没有给出衡量block、layer层重要程度实验的代码
+🎉  本项目为下面ACL2023论文的实现：[Parameter-efficient Weight Ensembling Facilitates Task-level Knowledge Transfer](https://aclanthology.org/2023.acl-short.24/)
 
 
 
-
-
-# Parameter-efficient Weight Ensembling Facilitates Task-level Knowledge Transfer
 
 ## 环境配置
 
@@ -237,4 +226,26 @@ python unit_model_others.py
 ```bash
 cd ../scripts
 bash adapter.sh
+```
+
+## 说明
+
+仓库中的部分代码（例如：tune_hps_singletask.py）参考了[Crossfit](https://github.com/INK-USC/CrossFit).
+
+## 反馈问题或疑问？
+
+如果您对该代码或论文有任何疑问，请联系 Xingtai Lv (lvxt20@mails.tsinghua.edu.cn) 或者开一个 Github issue。
+
+## 引用
+
+如果你觉得我们的工作有用，请参考以下引用：
+
+```bibtex
+@inproceedings{lv2023parameter,
+  title={Parameter-efficient Weight Ensembling Facilitates Task-level Knowledge Transfer},
+  author={Lv, Xingtai and Ding, Ning and Qin, Yujia and Liu, Zhiyuan and Sun, Maosong},
+  booktitle={Proceedings of the 61st Annual Meeting of the Association for Computational Linguistics (Volume 2: Short Papers)},
+  pages={270--282},
+  year={2023}
+}
 ```
